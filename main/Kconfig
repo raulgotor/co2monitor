@@ -1,0 +1,15 @@
+# Kconfig file for app configuration
+
+menu "Application configuration"
+
+    config CO2_MONITOR_DEVICE_URL
+        string
+        prompt "Enter server's URL"
+        default "http://dummy.server:8080"
+
+    config CO2_MONITOR_DEVICE_TOKEN
+        string
+        prompt "Enter the device's token"
+        default my_favorite_token
+
+endmenu

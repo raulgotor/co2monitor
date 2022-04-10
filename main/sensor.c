@@ -24,9 +24,11 @@
 #include <string.h>
 
 #include "esp_log.h"
+#include "esp_http_client.h"
 #include "driver/uart.h"
 #include "winsen_mh_z19.h"
 
+#include "http.h"
 #include "sensor.h"
 
 /*
@@ -72,6 +74,7 @@ static mh_z19_error_t xfer_func(uint8_t const * const p_rx_buffer,
 TaskHandle_t sensor_task_h = NULL;
 
 extern xQueueHandle display_q;
+extern xQueueHandle http_q;
 
 /*
  *******************************************************************************
@@ -227,6 +230,7 @@ _Noreturn static void sensor_task(void *pvParameter) {
         (void)pvParameter;
 
         xTaskNotifyWaitIndexed(0,0,0,0, portMAX_DELAY);
+        xTaskNotifyWaitIndexed(1,0,0,0, portMAX_DELAY);
 
         while (1) {
 
@@ -235,6 +239,10 @@ _Noreturn static void sensor_task(void *pvParameter) {
                 if (MH_Z19_ERROR_SUCCESS == mh_z19_result) {
                         if (NULL != display_q) {
                                 xQueueSend(display_q, &co2_ppm, 0);
+                        }
+
+                        if (NULL != http_q) {
+                                xQueueSend(http_q, &co2_ppm, 0);
                         }
 
                         ESP_LOGI(TAG,"CO2 concentration %d ppm", co2_ppm);

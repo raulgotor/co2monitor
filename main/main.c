@@ -35,6 +35,8 @@
 
 #include "disp_spi.h"
 
+#include "http.h"
+#include "wifi.h"
 #include "display.h"
 #include "sensor.h"
 
@@ -98,6 +100,10 @@ void app_main(void) {
         success = success & sensor_init();
 
         success = success & display_init();
+
+        success = success & wifi_init();
+
+        success = success & http_init();
 
         if (!success) {
                 assert(0 && "init failed");
