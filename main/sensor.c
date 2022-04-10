@@ -1,110 +1,256 @@
-//
-// Created by Raúl Gotor on 12/31/20.
-//
+/*!
+ *******************************************************************************
+ * @file sensor.c
+ *
+ * @brief
+ *
+ * @author Raúl Gotor (raulgotor@gmail.com)
+ * @date 03.04.22
+ *
+ * @par
+ * COPYRIGHT NOTICE: (c) 2022 Raúl Gotor
+ * All rights reserved.
+ *******************************************************************************
+ */
 
-#include "sensor.h"
+/*
+ *******************************************************************************
+ * #include Statements                                                         *
+ *******************************************************************************
+ */
+
+#include <stdio.h>
 #include <stdint.h>
 #include <string.h>
-#include <stdio.h>
+
+#include "esp_log.h"
 #include "driver/uart.h"
+#include "winsen_mh_z19.h"
 
-char sensor_read_cmd[9] = {
-    0xFF, 0x01, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00, 0x79
-};
+#include "sensor.h"
 
-char sensor_calibrate_cmd[9] = {
-    0xFF, 0x01, 0x87, 0x00, 0x00, 0x00, 0x00, 0x00, 0x78
-};
+/*
+ *******************************************************************************
+ * Private Macros                                                              *
+ *******************************************************************************
+ */
 
-char sensor_abd_off_cmd[9] = {
-    0xFF, 0x01, 0x79, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80
-};
+#define TAG                                 "Sensor"
 
-xQueueHandle sensor_do_q;
+/*
+ *******************************************************************************
+ * Data types                                                                  *
+ *******************************************************************************
+ */
 
-static void sensor_calibrate();
+/*
+ *******************************************************************************
+ * Constants                                                                   *
+ *******************************************************************************
+ */
 
-static int8_t sensor_init(void);
 
-static int8_t sensor_init(void) {
-        int8_t result = 0;
-    sensor_do_q = xQueueCreate(10U, sizeof(uint32_t));
-        if (NULL == sensor_do_q) {
-            assert(0);
-            result = -1;
+/*
+ *******************************************************************************
+ * Private Function Prototypes                                                 *
+ *******************************************************************************
+ */
+
+_Noreturn static void sensor_task(void *pvParameter);
+
+static mh_z19_error_t xfer_func(uint8_t const * const p_rx_buffer,
+                                size_t const rx_buffer_size,
+                                uint8_t * const p_tx_buffer,
+                                size_t const tx_buffer_size);
+
+/*
+ *******************************************************************************
+ * Public Data Declarations                                                    *
+ *******************************************************************************
+ */
+
+TaskHandle_t sensor_task_h = NULL;
+
+extern xQueueHandle display_q;
+
+/*
+ *******************************************************************************
+ * Static Data Declarations                                                    *
+ *******************************************************************************
+ */
+
+static uart_port_t const m_uart_instance = UART_NUM_2;
+static int const m_uart_tx_pin = 33;
+static int const m_uart_rx_pin = 32;
+
+/*
+ *******************************************************************************
+ * Public Function Bodies                                                      *
+ *******************************************************************************
+ */
+
+bool sensor_init(void) {
+
+        uart_config_t const uart_config = {
+                        .baud_rate = 9600,
+                        .data_bits = UART_DATA_8_BITS,
+                        .parity = UART_PARITY_DISABLE,
+                        .stop_bits = UART_STOP_BITS_1,
+                        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        };
+
+        int const uart_buffer_size = (1024 * 2);
+        bool success = true;
+
+        esp_err_t esp_result;
+        QueueHandle_t uart_queue;
+        BaseType_t task_result;
+        mh_z19_error_t mh_z19_result;
+
+        esp_result = uart_set_pin(
+                        m_uart_instance,
+                        m_uart_tx_pin,
+                        m_uart_rx_pin,
+                        UART_PIN_NO_CHANGE,
+                        UART_PIN_NO_CHANGE);
+
+        success = (ESP_OK == esp_result);
+
+        if (success) {
+                esp_result = uart_param_config(m_uart_instance, &uart_config);
+
+                success = (ESP_OK == esp_result);
         }
 
-        uart_config_t uart_config = {
-            .baud_rate = 9600,
-            .data_bits = UART_DATA_8_BITS,
-            .parity = UART_PARITY_DISABLE,
-            .stop_bits = UART_STOP_BITS_1,
-            .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
-            };
+        if (success) {
+                esp_result = uart_driver_install(
+                                m_uart_instance,
+                                uart_buffer_size,
+                                uart_buffer_size,
+                                10,
+                                &uart_queue,
+                                0);
 
-        const int uart_num = UART_NUM_2;
+                success = (ESP_OK == esp_result);
+        }
 
-        ESP_ERROR_CHECK(uart_set_pin(
-            UART_NUM_2,
-            33,
-            32,
-            UART_PIN_NO_CHANGE,
-            UART_PIN_NO_CHANGE));
+        if (success) {
+                mh_z19_result = mh_z19_init(xfer_func);
 
-        ESP_ERROR_CHECK(uart_param_config(uart_num, &uart_config));
+                success = (MH_Z19_ERROR_SUCCESS == mh_z19_result);
+        }
 
-        const int uart_buffer_size = (1024 * 2);
-        QueueHandle_t uart_queue;
-        ESP_ERROR_CHECK(uart_driver_install(
-            UART_NUM_2,
-            uart_buffer_size,
-            uart_buffer_size,
-            10,
-            &uart_queue,
-            0
-            ));
+        if (success) {
+                mh_z19_result = mh_z19_enable_abc(false);
 
-        /* switch off auto-calibration every 24h */
-        uart_write_bytes(UART_NUM_2, (const char *) sensor_abd_off_cmd, 9);
+                success = (MH_Z19_ERROR_SUCCESS == mh_z19_result);
+        }
+
+        if (success) {
+                task_result = xTaskCreate((TaskFunction_t)sensor_task,
+                                          "sensor_task",
+                                          8000,
+                                          NULL,
+                                          2,
+                                          &sensor_task_h);
+
+                success = (pdPASS == task_result);
+        }
+
+        return success;
+}
+
+
+/*
+ *******************************************************************************
+ * Private Function Bodies                                                     *
+ *******************************************************************************
+ */
+
+static mh_z19_error_t xfer_func(uint8_t const * const p_rx_buffer,
+                                size_t const rx_buffer_size,
+                                uint8_t * const p_tx_buffer,
+                                size_t const tx_buffer_size)
+{
+
+        mh_z19_error_t result = MH_Z19_ERROR_SUCCESS;
+        bool is_rx_operation = true;
+        int uart_result;
+
+        if ((NULL == p_rx_buffer) != (0 == rx_buffer_size)) {
+                result = MH_Z19_ERROR_BAD_PARAMETER;
+
+        } else if ((NULL == p_tx_buffer) != (0 == tx_buffer_size)) {
+                result = MH_Z19_ERROR_BAD_PARAMETER;
+
+        } else if ((NULL == p_rx_buffer) && (NULL == p_tx_buffer)) {
+                result = MH_Z19_ERROR_BAD_PARAMETER;
+        } else if (0 != tx_buffer_size) {
+                is_rx_operation = false;
+        }
+
+        if ((MH_Z19_ERROR_SUCCESS == result) && (is_rx_operation)) {
+                uart_result = uart_read_bytes(m_uart_instance,
+                                              (void *)p_rx_buffer,
+                                              (uint32_t)rx_buffer_size, 100);
+
+                if (-1 == uart_result) {
+                        result = MH_Z19_ERROR_IO_ERROR;
+                }
+
+        } else if (MH_Z19_ERROR_SUCCESS == result) {
+                uart_result = uart_write_bytes(m_uart_instance,
+                                               (void *)p_tx_buffer,
+                                               (uint32_t)tx_buffer_size);
+
+                if (-1 == uart_result) {
+                        result = MH_Z19_ERROR_IO_ERROR;
+                }
+        }
 
         return result;
 }
 
-static void sensor_calibrate() {
-    uart_write_bytes(UART_NUM_2, (const char *) sensor_calibrate_cmd, 9);
+/*
+ *******************************************************************************
+ * Interrupt Service Routines / Tasks / Thread Main Functions                  *
+ *******************************************************************************
+ */
+
+_Noreturn static void sensor_task(void *pvParameter) {
+
+        uint32_t co2_ppm;
+        uint32_t io_pressed = 0;
+        mh_z19_error_t mh_z19_result;
+        BaseType_t task_notify_result;
+
+        (void)pvParameter;
+
+        xTaskNotifyWaitIndexed(0,0,0,0, portMAX_DELAY);
+
+        while (1) {
+
+                mh_z19_result = mh_z19_get_gas_concentration(&co2_ppm);
+
+                if (MH_Z19_ERROR_SUCCESS == mh_z19_result) {
+                        if (NULL != display_q) {
+                                xQueueSend(display_q, &co2_ppm, 0);
+                        }
+
+                        ESP_LOGI(TAG,"CO2 concentration %d ppm", co2_ppm);
+                }
+
+                //TODO: to ms
+                //vTaskDelay(500);
+                task_notify_result = xTaskNotifyWait(0, 0, &io_pressed, 500);
+
+                if (pdPASS == task_notify_result) {
+
+                        if (35 == io_pressed) {
+                                (void)mh_z19_calibrate_zero_point();
+                        }
+                }
+        }
 }
 
-void sensor_task(void *pvParameter) {
-    uint32_t i = 0;
-    uint32_t result = 0;
-    uint8_t in_buffer[9 * 10];
-    uint32_t io_pressed = 0;
-
-    if (0 != sensor_init()) {
-        assert(0);
-    }
-
-    while (1) {
-
-        int length = 9;
-
-        uart_write_bytes(UART_NUM_2, (const char *) sensor_read_cmd, 9);
-        uart_read_bytes(UART_NUM_2, in_buffer, length, 100);
-
-        i = (uint32_t) in_buffer[2] * 256 + (uint32_t) in_buffer[3];
-
-        xQueueSend(sensor_do_q, &i, 500 / portTICK_PERIOD_MS);
-        i++;
-        if (pdPASS == xTaskNotifyWait(
-            0,
-            0,
-            &io_pressed,
-            0)) {
-            if (35 == io_pressed) {
-                sensor_calibrate();
-            }
-        };
-    }
-    vTaskDelete(NULL);
-}
 
