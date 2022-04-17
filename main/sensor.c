@@ -27,8 +27,13 @@
 #include "esp_http_client.h"
 #include "driver/uart.h"
 #include "winsen_mh_z19.h"
+#include "freertos/semphr.h"
 
 #include "http.h"
+#include "display.h"
+#include "wifi.h"
+#include "main.h"
+
 #include "sensor.h"
 
 /*
@@ -39,6 +44,8 @@
 
 #define TAG                                 "Sensor"
 
+#define SENSOR_TASK_REFRESH_RATE_MS         (1000)
+#define SENSOR_TASK_REFRESH_RATE_TICKS      (pdMS_TO_TICKS(SENSOR_TASK_REFRESH_RATE_MS))
 /*
  *******************************************************************************
  * Data types                                                                  *
@@ -60,6 +67,8 @@
 
 _Noreturn static void sensor_task(void *pvParameter);
 
+static inline bool sensor_lock(bool lock);
+
 static mh_z19_error_t xfer_func(uint8_t const * const p_rx_buffer,
                                 size_t const rx_buffer_size,
                                 uint8_t * const p_tx_buffer,
@@ -74,6 +83,7 @@ static mh_z19_error_t xfer_func(uint8_t const * const p_rx_buffer,
 TaskHandle_t sensor_task_h = NULL;
 
 extern xQueueHandle display_q;
+
 extern xQueueHandle http_q;
 
 /*
@@ -83,9 +93,12 @@ extern xQueueHandle http_q;
  */
 
 static uart_port_t const m_uart_instance = UART_NUM_2;
+
 static int const m_uart_tx_pin = 33;
+
 static int const m_uart_rx_pin = 32;
 
+static QueueHandle_t m_uart_mutex_q = NULL;
 /*
  *******************************************************************************
  * Public Function Bodies                                                      *
@@ -144,7 +157,18 @@ bool sensor_init(void) {
         }
 
         if (success) {
+                m_uart_mutex_q = xSemaphoreCreateMutex();
+
+                success = (NULL != m_uart_mutex_q);
+        }
+
+        if (success) {
+
+                (void)sensor_lock(true);
+
                 mh_z19_result = mh_z19_enable_abc(false);
+
+                (void)sensor_lock(false);
 
                 success = (MH_Z19_ERROR_SUCCESS == mh_z19_result);
         }
@@ -169,6 +193,19 @@ bool sensor_init(void) {
  * Private Function Bodies                                                     *
  *******************************************************************************
  */
+
+static inline bool sensor_lock(bool lock)
+{
+        BaseType_t semaphore_result;
+
+        if (lock) {
+                semaphore_result = xSemaphoreTake(m_uart_mutex_q, portMAX_DELAY);
+        } else {
+                semaphore_result = xSemaphoreGive(m_uart_mutex_q);
+        }
+
+        return (pdTRUE == semaphore_result);
+}
 
 static mh_z19_error_t xfer_func(uint8_t const * const p_rx_buffer,
                                 size_t const rx_buffer_size,
@@ -220,7 +257,7 @@ static mh_z19_error_t xfer_func(uint8_t const * const p_rx_buffer,
  *******************************************************************************
  */
 
-_Noreturn static void sensor_task(void *pvParameter) {
+_Noreturn static void sensor_task(void * pvParameter) {
 
         uint32_t co2_ppm;
         uint32_t io_pressed = 0;
@@ -229,33 +266,58 @@ _Noreturn static void sensor_task(void *pvParameter) {
 
         (void)pvParameter;
 
+        // Wait for `http_q` and `display_q` to be ready
         xTaskNotifyWaitIndexed(0,0,0,0, portMAX_DELAY);
         xTaskNotifyWaitIndexed(1,0,0,0, portMAX_DELAY);
 
         while (1) {
 
+                task_notify_result = xTaskNotifyWait(0, 0,
+                                                     &io_pressed,
+                                                     SENSOR_TASK_REFRESH_RATE_TICKS);
+
+                /*
+                 * Don't even read the sensor if there is no one interested in
+                 * the output
+                 */
+                if ((!display_is_active()) &&
+                    (WIFI_STATUS_CONNECTED != wifi_get_status())) {
+
+                        // Code style exception for the shake of readability
+                        continue;
+                }
+
+                (void)sensor_lock(true);
                 mh_z19_result = mh_z19_get_gas_concentration(&co2_ppm);
+                (void)sensor_lock(false);
 
                 if (MH_Z19_ERROR_SUCCESS == mh_z19_result) {
-                        if (NULL != display_q) {
-                                xQueueSend(display_q, &co2_ppm, 0);
-                        }
 
-                        if (NULL != http_q) {
-                                xQueueSend(http_q, &co2_ppm, 0);
+                        // Don't sent info to display if it isn't active
+                        if ((NULL != display_q) && (display_is_active())) {
+                                (void)display_set_concentration(co2_ppm);
+                        }
+                        ESP_LOGI(TAG,"CO2 status %d ppm", wifi_get_status());
+
+                        // Don't attempt to post to server if there is no wifi
+                        if ((NULL != http_q) &&
+                            (WIFI_STATUS_CONNECTED == wifi_get_status())) {
+
+                                (void)xQueueSend(http_q, &co2_ppm, 0);
                         }
 
                         ESP_LOGI(TAG,"CO2 concentration %d ppm", co2_ppm);
                 }
 
-                //TODO: to ms
-                //vTaskDelay(500);
-                task_notify_result = xTaskNotifyWait(0, 0, &io_pressed, 500);
+                if ((MH_Z19_ERROR_SUCCESS == mh_z19_result) &&
+                    (pdPASS == task_notify_result) &&
+                    (display_is_active())) {
 
-                if (pdPASS == task_notify_result) {
-
-                        if (35 == io_pressed) {
+                        if (CALIBRATION_BUTTON == io_pressed) {
+                                (void)sensor_lock(true);
                                 (void)mh_z19_calibrate_zero_point();
+                                (void)sensor_lock(false);
+
                         }
                 }
         }

@@ -2,6 +2,16 @@
 
 menu "Application configuration"
 
+    config CO2_MONITOR_WIFI_SSID
+        string
+        prompt "SSID of the AP station to connect to"
+        default "Default_SSID_name"
+
+    config CO2_MONITOR_WIFI_PASSWORD
+        string
+        prompt "Password of the AP station"
+        default "password"
+
     config CO2_MONITOR_DEVICE_URL
         string
         prompt "Enter server's URL"
@@ -11,5 +21,10 @@ menu "Application configuration"
         string
         prompt "Enter the device's token"
         default my_favorite_token
+
+    config CO2_MONITOR_DISPLAY_BACKLIGHT_TIMEOUT_S
+        int
+        prompt "Enter the time in seconds for the display's backlight to turn off (0 for no automatic turn off)"
+        default 60
 
 endmenu

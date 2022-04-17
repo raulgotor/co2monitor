@@ -23,6 +23,8 @@
 #include <stdbool.h>
 
 #include "esp_http_client.h"
+#include "wifi.h"
+
 #include "esp_log.h"
 
 /*
@@ -145,6 +147,7 @@ bool http_init(void) {
 void http_send_data(uint32_t const data)
 {
 
+        ESP_LOGI(TAG,"SENDING DATA....");
         esp_err_t esp_result;
         bool success;
         char post_data[30];
@@ -208,11 +211,14 @@ _Noreturn static void http_task(void *pvParameter)
         (void)pvParameter;
         uint32_t co2_ppm;
         BaseType_t queue_result;
+        wifi_status_t wifi_status;
 
         for (;;) {
                 queue_result = xQueueReceive(http_q, &co2_ppm, 500);
 
-                if (pdTRUE == queue_result) {
+                wifi_status = wifi_get_status();
+
+                if (pdTRUE == queue_result && (WIFI_STATUS_CONNECTED == wifi_status)) {
                         (void)http_send_data(co2_ppm);
                 }
         }

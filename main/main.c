@@ -40,6 +40,8 @@
 #include "display.h"
 #include "sensor.h"
 
+#include "main.h"
+
 /*
  *******************************************************************************
  * Private Macros                                                              *
@@ -47,7 +49,6 @@
  */
 
 #define LV_LVGL_H_INCLUDE_SIMPLE            (1)
-#define CALIBRATION_BUTTON                  (35)
 
 /*
  *******************************************************************************
@@ -78,6 +79,7 @@ static void IRAM_ATTR gpio_isr_handler(void *parameters);
  */
 
 extern TaskHandle_t sensor_task_h;
+extern TaskHandle_t display_task_h;
 
 /*
  *******************************************************************************
@@ -122,17 +124,19 @@ void app_main(void) {
 
 static bool gpio_setup() {
 
-        uint64_t const calibration_button_mask = (1ULL << CALIBRATION_BUTTON);
-        gpio_config_t io_config;
+        uint64_t const gpio_input_mask = (1ULL << BACKLIGHT_BUTTON) |
+                                         (1ULL << CALIBRATION_BUTTON);
+
+        gpio_config_t gpio_input_config;
         bool success = true;
         esp_err_t esp_result;
 
-        io_config.mode = GPIO_MODE_INPUT;
-        io_config.intr_type = GPIO_INTR_POSEDGE;
-        io_config.pin_bit_mask = calibration_button_mask;
-        io_config.pull_up_en = GPIO_PULLUP_ENABLE;
+        gpio_input_config.mode = GPIO_MODE_INPUT;
+        gpio_input_config.intr_type = GPIO_INTR_POSEDGE;
+        gpio_input_config.pin_bit_mask = gpio_input_mask;
+        gpio_input_config.pull_up_en = GPIO_PULLUP_ENABLE;
 
-        esp_result = gpio_config(&io_config);
+        esp_result = gpio_config(&gpio_input_config);
 
         if (ESP_OK != esp_result) {
                 success = false;
@@ -151,6 +155,16 @@ static bool gpio_setup() {
                 success = (ESP_OK == esp_result);
         }
 
+        if (success) {
+                esp_result = gpio_isr_handler_add(
+                                BACKLIGHT_BUTTON,
+                                gpio_isr_handler,
+                                (void *) BACKLIGHT_BUTTON);
+
+
+                success = (ESP_OK == esp_result);
+        }
+
         return success;
 }
 
@@ -162,9 +176,17 @@ static bool gpio_setup() {
 
 static void IRAM_ATTR gpio_isr_handler(void * parameters) {
 
-    uint32_t const gpio_num = (uint32_t)parameters;
+        gpio_num_t const gpio_num = (gpio_num_t)parameters;
 
-    if (CALIBRATION_BUTTON == gpio_num) {
-        xTaskNotifyFromISR(sensor_task_h, gpio_num, eSetValueWithOverwrite, NULL);
-    }
+        switch (gpio_num) {
+        case CALIBRATION_BUTTON:
+                //xTaskNotifyFromISR(sensor_task_h, gpio_num, eSetValueWithOverwrite, NULL);
+                break;
+        case BACKLIGHT_BUTTON:
+
+                xTaskNotifyFromISR(display_task_h, gpio_num, eSetValueWithOverwrite, NULL);
+                break;
+        default:
+                break;
+        }
 }

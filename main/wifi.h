@@ -30,6 +30,13 @@
  *******************************************************************************
  */
 
+typedef enum {
+        WIFI_STATUS_CONNECTED = 0,
+        WIFI_STATUS_DISCONNECTED,
+        WIFI_STATUS_FAILED,
+        WIFI_STATUS_COUNT
+} wifi_status_t;
+
 /*
  *******************************************************************************
  * Public Constants                                                            *
@@ -44,5 +51,8 @@
  */
 
 bool wifi_init();
+
+wifi_status_t wifi_get_status(void);
+
 
 #endif //WIFI_H
