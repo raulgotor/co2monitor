@@ -44,9 +44,9 @@
 
 #define TAG "WiFi"
 
-#define WIFI_RECONNECTION_TIMEOUT_MS        (20000)
 #define WIFI_SSID                           CONFIG_CO2_MONITOR_WIFI_SSID
-#define WIFI_PASSWORD                       CONFIG_CO2_MONITOR_WIFI_SSID
+#define WIFI_PASSWORD                       CONFIG_CO2_MONITOR_WIFI_PASSWORD
+#define WIFI_RECONNECTION_TIMEOUT_MS        (CONFIG_CO2_MONITOR_AUTO_RECONNECT_TIME_S * 1000)
 
 #if EVENT_BITS
 /* FreeRTOS event group to signal when we are connected*/

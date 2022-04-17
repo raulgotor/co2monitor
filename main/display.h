@@ -22,7 +22,7 @@
  *******************************************************************************
  */
 
-#define DISPLAY_BACKLIGHT_TIMEOUT_MS        10000 //(CONFIG_CO2_MONITOR_DISPLAY_BACKLIGHT_TIMEOUT_S * 1000)
+#define DISPLAY_BACKLIGHT_TIMEOUT_MS        (CONFIG_CO2_MONITOR_DISPLAY_BACKLIGHT_TIMEOUT_S * 1000)
 #define DISPLAY_RSSI_NO_IP_VALUE            INT8_MIN
 
 /*
