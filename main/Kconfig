@@ -1,0 +1,35 @@
+# Kconfig file for app configuration
+
+menu "Application configuration"
+
+    config CO2_MONITOR_WIFI_SSID
+        string
+        prompt "AP station SSID"
+        default "Default_SSID_name"
+
+    config CO2_MONITOR_WIFI_PASSWORD
+        string
+        prompt "AP station password"
+        default "password"
+
+    config CO2_MONITOR_AUTO_RECONNECT_TIME_S
+            int
+            prompt "Attempt reconnection some time after a failed connection event (in seconds)"
+            default 300
+
+    config CO2_MONITOR_DEVICE_URL
+        string
+        prompt "Thingsboard server's URL"
+        default "http://dummy.server:8080"
+
+    config CO2_MONITOR_DEVICE_TOKEN
+        string
+        prompt "Device token at Thingsboard server"
+        default my_favorite_token
+
+    config CO2_MONITOR_DISPLAY_BACKLIGHT_TIMEOUT_S
+        int
+        prompt "Backlight automatic turn off (in seconds, 0 for no automatic turn off)"
+        default 60
+
+endmenu

@@ -1,11 +1,11 @@
 /*!
  *******************************************************************************
- * @file display.h
+ * @file wifi.h
  *
- * @brief
+ * @brief 
  *
  * @author Raúl Gotor (raulgotor@gmail.com)
- * @date 03.04.22
+ * @date 08.04.22
  *
  * @par
  * COPYRIGHT NOTICE: (c) 2022 Raúl Gotor
@@ -13,8 +13,9 @@
  *******************************************************************************
  */
 
-#ifndef MAIN_MAIN_DISPLAY_H_
-#define MAIN_MAIN_DISPLAY_H_
+
+#ifndef WIFI_H
+#define WIFI_H
 
 /*
  *******************************************************************************
@@ -22,8 +23,6 @@
  *******************************************************************************
  */
 
-#define DISPLAY_BACKLIGHT_TIMEOUT_MS        (CONFIG_CO2_MONITOR_DISPLAY_BACKLIGHT_TIMEOUT_S * 1000)
-#define DISPLAY_RSSI_NO_IP_VALUE            INT8_MIN
 
 /*
  *******************************************************************************
@@ -32,24 +31,11 @@
  */
 
 typedef enum {
-        DISPLAY_MSG_CO2_PPM = 0,
-        DISPLAY_MSG_WIFI_STATUS,
-        DISPLAY_MSG_COUNT
-} display_msg_type_t;
-
-typedef struct {
-        int8_t rssi;
-        uint32_t ip;
-} display_wifi_status_t;
-
-typedef struct {
-        display_msg_type_t type;
-        union {
-                uint32_t numeric_value;
-                display_wifi_status_t wifi_status;
-        };
-} display_msg_t;
-
+        WIFI_STATUS_CONNECTED = 0,
+        WIFI_STATUS_DISCONNECTED,
+        WIFI_STATUS_FAILED,
+        WIFI_STATUS_COUNT
+} wifi_status_t;
 
 /*
  *******************************************************************************
@@ -64,12 +50,9 @@ typedef struct {
  *******************************************************************************
  */
 
-bool display_init(void);
+bool wifi_init();
 
-bool display_set_wifi_status(display_wifi_status_t const display_wifi_status);
+wifi_status_t wifi_get_status(void);
 
-bool display_set_concentration(uint32_t const concentration);
 
-bool display_is_active(void);
-
-#endif //MAIN_MAIN_DISPLAY_H_
+#endif //WIFI_H
