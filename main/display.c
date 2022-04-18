@@ -29,6 +29,7 @@
 #include "freertos/queue.h"
 #include "freertos/timers.h"
 
+#include "driver/adc_common.h"
 #include "esp_freertos_hooks.h"
 #include "esp_log.h"
 
@@ -44,6 +45,7 @@
  */
 
 #define DISPLAY_NO_IP_TEXT                  "No IP"
+#define TAG                                 "DISPLAY"
 
 /*
  *******************************************************************************
@@ -56,8 +58,6 @@
  * Constants                                                                   *
  *******************************************************************************
  */
-
-static char const * TAG = __FILE__;
 
 xQueueHandle display_q;
 
@@ -85,6 +85,8 @@ static void display_enable_backlight(bool const enable);
 
 extern TaskHandle_t sensor_task_h;
 
+extern TaskHandle_t battery_task_h;
+
 TaskHandle_t display_task_h = NULL;
 
 /*
@@ -93,21 +95,27 @@ TaskHandle_t display_task_h = NULL;
  *******************************************************************************
  */
 
-static lv_style_t m_ppm_style;
+static lv_style_t m_concentration_style;
 
 static lv_style_t m_units_style;
 
 static lv_style_t m_bg_style;
 
-static uint16_t  const m_wifi_sign_width = 30;
+static int16_t  const m_wifi_sign_width = 30;
 
-static uint16_t  const m_wifi_sign_height = (m_wifi_sign_width / 2);
+static int16_t  const m_wifi_sign_height = (m_wifi_sign_width / 2);
 
 static lv_color_t buffer[LV_CANVAS_BUF_SIZE_TRUE_COLOR(30, 15)];
 
+static int16_t  const m_battery_sign_width = 30;
+
+static int16_t  const m_battery_sign_height = (m_battery_sign_width / 2);
+
+static lv_color_t battery_sign_buffer[LV_CANVAS_BUF_SIZE_TRUE_COLOR(30, 15)];
+
 static TimerHandle_t m_backlight_timer_h = NULL;
 
-static uint32_t m_display_task_refresh_rate = pdMS_TO_TICKS(1000);
+static uint32_t m_display_task_refresh_rate = pdMS_TO_TICKS(100);
 
 static lv_color_t m_buffer_1[DISP_BUF_SIZE];
 
@@ -176,8 +184,9 @@ bool display_init(void)
         }
 
         if (success) {
-                // Tell `sensor_task_h` that our queue is ready to be used
+                // Tell `sensor_task_h` and `battery_task_h` that our queue is ready to be used
                 (void)xTaskNotifyIndexed(sensor_task_h, 0, 0, eNoAction);
+                (void)xTaskNotifyIndexed(battery_task_h, 0, 0, eNoAction);
 
                 task_result = xTaskCreate((TaskFunction_t)display_task,
                             "display_task",
@@ -202,6 +211,12 @@ bool display_set_concentration(uint32_t const concentration)
 {
         return display_send_message(DISPLAY_MSG_CO2_PPM,
                                     (void *)(concentration));
+}
+
+bool display_set_battery_level(uint32_t const battery_level)
+{
+        return display_send_message(DISPLAY_MSG_BATTERY_LEVEL,
+                                    (void *)(battery_level));
 }
 
 bool display_is_active(void)
@@ -240,6 +255,7 @@ static bool display_send_message(display_msg_type_t const type, void * value)
                 switch (type) {
 
                 case DISPLAY_MSG_CO2_PPM:
+                case DISPLAY_MSG_BATTERY_LEVEL:
                         p_message->numeric_value = (uint32_t)value;
                         break;
 
@@ -279,12 +295,11 @@ static void display_enable_backlight(bool const enable)
                 (void)xTimerReset(m_backlight_timer_h, 0);
                 m_display_task_refresh_rate = pdMS_TO_TICKS(1000);
         } else {
+                (void)xTimerStop(m_backlight_timer_h, 0);
                 m_display_task_refresh_rate = portMAX_DELAY;
         }
 
         st7789_enable_backlight(enable);
-
-
 }
 
 static void draw_network_symbol(lv_obj_t * canvas, int8_t strength)
@@ -350,6 +365,95 @@ static void draw_network_symbol(lv_obj_t * canvas, int8_t strength)
         }
 }
 
+static void draw_battery_symbol(lv_obj_t * canvas, int8_t level)
+{
+        int8_t const min_level = 1;
+        int8_t const med_level = 2;
+        int8_t const max_level = 3;
+
+        int16_t const connector_width = 2;
+        int16_t const battery_divisions = 3;
+        int16_t const internal_margin = 2;
+        int16_t const active_zone_border_height = m_battery_sign_height;
+        int16_t const active_zone_border_width = m_battery_sign_width - connector_width;
+        int16_t const active_zone_width = active_zone_border_width - (internal_margin * 2);
+        int16_t const active_rect_width = active_zone_width / battery_divisions;
+        int16_t const active_rect_heigh = active_zone_border_height - (internal_margin * 2);
+        int16_t const active_rect_pos_x = 0 + internal_margin;
+        int16_t const active_rect_pos_y = 0 + internal_margin;
+        int16_t const active_rect_1_width = active_rect_width * 1;
+        int16_t const active_rect_2_width = active_rect_width * 2;
+        int16_t const active_rect_3_width = active_rect_width * 3;
+        int16_t const connector_height = 5;
+        int16_t const connector_margin = (m_battery_sign_height - connector_height) / 2;
+
+        lv_draw_rect_dsc_t draw_dsc;
+        lv_color_t border_color;
+        lv_color_t fill_color;
+        lv_coord_t rect_width;
+
+        level = 4;
+
+
+        lv_canvas_set_buffer(canvas,
+                             battery_sign_buffer,
+                             (lv_coord_t)m_battery_sign_width,
+                             (lv_coord_t)m_battery_sign_height,
+                             LV_IMG_CF_TRUE_COLOR);
+
+        lv_canvas_fill_bg(canvas, LV_COLOR_BLACK, LV_OPA_COVER);
+        lv_draw_rect_dsc_init(&draw_dsc);
+
+
+        border_color = LV_COLOR_WHITE;
+        fill_color = LV_COLOR_RED;
+
+
+        if (max_level < level) {
+                fill_color = LV_COLOR_GREEN;
+                rect_width = active_rect_3_width;
+        } else if (med_level < level) {
+                fill_color = LV_COLOR_ORANGE;
+                rect_width = active_rect_2_width;
+        } else if (min_level < level) {
+                fill_color = LV_COLOR_RED;
+                rect_width = active_rect_1_width;
+        } else {
+                border_color = LV_COLOR_RED;
+                rect_width = 0;
+        }
+
+        draw_dsc.border_color = border_color;
+        draw_dsc.bg_opa = LV_OPA_TRANSP;
+        draw_dsc.border_width = 2;
+        draw_dsc.radius = 3;
+        draw_dsc.border_width = 1;
+
+        lv_canvas_draw_rect(canvas,
+                            0,
+                            0,
+                            active_zone_border_width,
+                            active_zone_border_height,
+                            &draw_dsc);
+
+        lv_canvas_draw_rect(canvas,
+                            active_zone_border_width,
+                            connector_margin,
+                            connector_width,
+                            connector_margin,
+                            &draw_dsc);
+
+        draw_dsc.border_color = fill_color;
+        draw_dsc.bg_color = fill_color;
+        draw_dsc.bg_opa = LV_OPA_COVER;
+
+        lv_canvas_draw_rect(canvas,
+                            active_rect_pos_x,
+                            active_rect_pos_y,
+                            rect_width,
+                            active_rect_heigh,
+                            &draw_dsc);
+}
 
 /*
  *******************************************************************************
@@ -362,17 +466,22 @@ _Noreturn static void display_task(void * pvParameters)
         uint32_t const low_concentration_max = 1000;
         uint32_t const high_concentration_min = 1500;
         char const * ip_label_default_text = "No IP";
+        char const * battery_label_default_text = "";
+        bool const backlight_automatic = (NULL != m_backlight_timer_h);
 
         lv_obj_t * const scr = lv_scr_act();
         lv_obj_t * const co2_value = lv_label_create(scr, NULL);
         lv_obj_t * const units = lv_label_create(scr, NULL);
         lv_obj_t * const ip_label = lv_label_create(scr, NULL);
-        lv_obj_t * const canvas = lv_canvas_create(scr, NULL);
+        lv_obj_t * const battery_label = lv_label_create(scr, NULL);
+        lv_obj_t * const wifi_sign_canvas = lv_canvas_create(scr, NULL);
+        lv_obj_t * const battery_sign_canvas = lv_canvas_create(scr, NULL);
 
         display_msg_t * p_message = NULL;
 
         int8_t rssi;
         uint32_t ip_addr;
+        uint32_t battery_level;
         uint8_t octets[4];
         uint32_t co2_ppm;
         char text[20];
@@ -380,15 +489,15 @@ _Noreturn static void display_task(void * pvParameters)
         BaseType_t queue_result;
         BaseType_t notification_result;
         lv_color_t co2_value_color;
-
+        bool display_active;
 
         /* configure CO2 concentration value style */
-        lv_style_set_text_font(&m_ppm_style, LV_STATE_DEFAULT, &lv_font_montserrat_48);
-        lv_style_set_text_color(&m_ppm_style, LV_STATE_DEFAULT, LV_COLOR_NAVY);
+        lv_style_set_text_font(&m_concentration_style, LV_STATE_DEFAULT, &lv_font_montserrat_48);
+        lv_style_set_text_color(&m_concentration_style, LV_STATE_DEFAULT, LV_COLOR_WHITE);
 
         /* configure CO2 concentration units style */
         lv_style_set_text_font(&m_units_style, LV_STATE_DEFAULT, &lv_font_montserrat_16);
-        lv_style_set_text_color(&m_units_style, LV_STATE_DEFAULT, LV_COLOR_GRAY);
+        lv_style_set_text_color(&m_units_style, LV_STATE_DEFAULT, LV_COLOR_WHITE);
 
         lv_style_set_bg_color(&m_bg_style, LV_STATE_DEFAULT, LV_COLOR_BLACK);
 
@@ -398,18 +507,25 @@ _Noreturn static void display_task(void * pvParameters)
 
         lv_obj_add_style(scr, LV_OBJ_PART_MAIN, &m_bg_style);
 
-        lv_obj_add_style(co2_value, LV_LABEL_PART_MAIN, &m_ppm_style);
-        lv_label_set_text(co2_value, ip_label_default_text);
+        lv_obj_add_style(co2_value, LV_LABEL_PART_MAIN, &m_concentration_style);
+        lv_label_set_text(co2_value, "-");
         lv_label_set_long_mode(co2_value, LV_LABEL_LONG_EXPAND);
         lv_obj_align(co2_value, NULL, LV_ALIGN_CENTER, 0, 0);
         lv_label_set_align(co2_value, LV_LABEL_ALIGN_CENTER);
-        lv_label_set_text(co2_value, "-");
 
         lv_obj_add_style(ip_label, LV_LABEL_PART_MAIN, &m_units_style);
         lv_label_set_text(ip_label, ip_label_default_text);
         lv_label_set_long_mode(ip_label, LV_LABEL_LONG_EXPAND);
         lv_obj_align(ip_label, NULL, LV_ALIGN_IN_TOP_RIGHT, 0, 0);
         lv_label_set_align(ip_label, LV_LABEL_ALIGN_RIGHT);
+
+        lv_obj_align(battery_sign_canvas, NULL, LV_ALIGN_IN_BOTTOM_LEFT, 0, -20);
+
+        lv_obj_add_style(battery_label, LV_LABEL_PART_MAIN, &m_units_style);
+        lv_label_set_text(battery_label, battery_label_default_text);
+        lv_label_set_long_mode(battery_label, LV_LABEL_LONG_EXPAND);
+        lv_obj_align(battery_label, battery_sign_canvas, LV_ALIGN_OUT_RIGHT_MID, 0, 0);
+        lv_label_set_align(battery_label, LV_LABEL_ALIGN_LEFT);
 
 
         while (1) {
@@ -419,12 +535,17 @@ _Noreturn static void display_task(void * pvParameters)
                                                       NULL,
                                                       m_display_task_refresh_rate);
 
-                // Reset the backlight timer only if it's configured
-                if ((pdPASS == notification_result) && (NULL != m_backlight_timer_h)) {
-                        display_enable_backlight(true);
+                // Handle backlight state only if automatic mode is configured configured
+                if ((pdPASS == notification_result) && (backlight_automatic)) {
 
-                        // We're not interested in out-dated messages
-                        xQueueReset(display_q);
+                        display_active = display_is_active();
+
+                        if (!display_is_active()) {
+                                // We're not interested in out-dated messages
+                                xQueueReset(display_q);
+                        }
+
+                        display_enable_backlight(!display_active);
                 }
 
                 // Don't receive any messages if the display won't show them
@@ -461,14 +582,14 @@ _Noreturn static void display_task(void * pvParameters)
 
                                 if (style_changed) {
                                         lv_style_set_text_color(
-                                                        &m_ppm_style,
+                                                        &m_concentration_style,
                                                         LV_STATE_DEFAULT,
                                                         co2_value_color);
 
                                         lv_obj_add_style(
                                                         co2_value,
                                                         LV_LABEL_PART_MAIN,
-                                                        &m_ppm_style);
+                                                        &m_concentration_style);
                                 }
 
                                 sprintf(text, "%u", co2_ppm);
@@ -500,11 +621,23 @@ _Noreturn static void display_task(void * pvParameters)
                                 lv_label_set_long_mode(ip_label, LV_LABEL_LONG_EXPAND);
                                 lv_obj_align(ip_label, NULL, LV_ALIGN_IN_TOP_RIGHT, 0, 0);
 
-                                draw_network_symbol(canvas, rssi);
+                                draw_network_symbol(wifi_sign_canvas, rssi);
 
                                 break;
 
-                        default:
+                        case DISPLAY_MSG_BATTERY_LEVEL:
+                                battery_level = p_message->numeric_value;
+
+                                sprintf(text, "%.2f V", ((float)battery_level) / 1000);
+
+                                lv_label_set_text(battery_label, text);
+                                lv_label_set_long_mode(battery_label, LV_LABEL_LONG_EXPAND);
+                                lv_obj_align(battery_label, battery_sign_canvas, LV_ALIGN_OUT_RIGHT_MID, 0, 0);
+
+                                draw_battery_symbol(battery_sign_canvas, 5);
+                                break;
+
+                                default:
                                 break;
                         }
 

@@ -147,7 +147,7 @@ bool http_init(void) {
 void http_send_data(uint32_t const data)
 {
 
-        ESP_LOGI(TAG,"SENDING DATA....");
+        ESP_LOGI(TAG,"Sending data to %s", URL);
         esp_err_t esp_result;
         bool success;
         char post_data[30];

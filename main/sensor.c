@@ -44,7 +44,7 @@
 
 #define TAG                                 "Sensor"
 
-#define SENSOR_TASK_REFRESH_RATE_MS         (1000)
+#define SENSOR_TASK_REFRESH_RATE_MS         (10000)
 #define SENSOR_TASK_REFRESH_RATE_TICKS      (pdMS_TO_TICKS(SENSOR_TASK_REFRESH_RATE_MS))
 /*
  *******************************************************************************
@@ -297,7 +297,6 @@ _Noreturn static void sensor_task(void * pvParameter) {
                         if ((NULL != display_q) && (display_is_active())) {
                                 (void)display_set_concentration(co2_ppm);
                         }
-                        ESP_LOGI(TAG,"CO2 status %d ppm", wifi_get_status());
 
                         // Don't attempt to post to server if there is no wifi
                         if ((NULL != http_q) &&
