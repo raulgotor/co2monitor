@@ -20,7 +20,7 @@
     <!img src="images/logo.png" alt="Logo" width="80" height="80">
   </a>
 
-<h3 align="center">Reflow Oven Controller</h3>
+<h3 align="center">TTGO ESP32 CO2 Monitor</h3>
 
   <p align="center">
     CO2 Monitor based on the MH-Z19B Infrared CO2 sensor running on a ESP32 TTGO Display V1.1
@@ -62,8 +62,11 @@
 
 [![Product Name Screen Shot][product-screenshot]](https://example.com)
 
-This is yet another Reflow oven controller. I wasn't fully convinced with what I
-found around the different repositories, so I created my own.
+Here you get a wireless battery powered CO2 monitor device with color display and internet connectivity.
+It is based on the very well known MH-Z19B sensor, and on a ESP32 TTGO Display board, which 
+integrates a display and two control push buttons, therefore facilitating build from readily
+available components. As the device is battery powered, it is very handy to perform on-field measurements.
+The information is sent to a specified Thingsboard.io server for further plotting.
 
 Basic features are:
 
@@ -96,7 +99,7 @@ with the TTGO board is as follows:
 |     Rx |        25 |
 |     Tx |        33 |
 
-![](assets/connections.jpg)
+<img height="" src="assets/connections.jpg" width="400"/>
 
 ### Installation
 
@@ -145,11 +148,7 @@ was able to post messages to the backend.
 The display can be turned on and off by pressing the bottom-right button at the TTGO board. Additionally, the display
 will turn off automatically after a specific amount of time which can be configured at the firmware configuration menu.
 
-Launch the configuration menu with:
-
-``` idf.py menuconfig```
-
-and navigate to `Component config -> Application configuration -> Backlight automatic turn off` and select the desired
+Launch the configuration menu with `idf.py menuconfig` and navigate to `Component config -> Application configuration -> Backlight automatic turn off` and select the desired
 timeout (in seconds). To disable automatic turn off, configure it to 0 seconds.
 
 ### Calibrating CO2 sensor
@@ -159,41 +158,7 @@ press the bottom-left button on the TTGO board. The device will calibrate itself
 as 400 ppm.
 
 __NOTE__: don't press the calibration button indoors as it will wrongly calibrate the device.
-
-### Profile editor screen
-
-This screen allows the user to create, edit and delete different soldering
-profiles. 
-
-The profiles can be tunned with the following parameters:
-
-- Profile Name
-- Preheating temperature
-  - Target temperature (°C) to which the device will heat during the preheating phase
-- Soaking time
-  - Time (in seconds) that the soaking phase will last. During this phase, the
-      temperature will be the same as in preheating phase
-- Reflow temperature
-   - Target temperature (°C) to which the device will heat during the reflow phase
-- Dwell time
-   - Time (in seconds) that the soaking phase will last. During this phase, the
-     temperature will be same as reflow phase target temperature.
-
-#### Selecting a profile
-
-To select a profile, tap on the profiles drop down list and tap again on the desired profile
-This profile will be used next time a reflow process starts.
-
-#### Creating a profile
-
-Tap on __New__ button. The profile editor will be shown. Provide a name, and tune
-the different temperature and time parameters as needed.
-
-#### Editing a profile
-
-Select the profile you want to edit, and then press __Edit__ button. The profile editor
-will shown. Tune the differents temperature and time parameters as needed.
-   
+ 
 ### Further documentation
 
 
@@ -225,7 +190,6 @@ Distributed under the MIT License. See `LICENSE` for more information.
 Raúl Gotor
 
 Project Link: [https://github.com/raulgotor/co2monitor](https://github.com/raulgotor/co2monitor)
-
 
 <!-- ACKNOWLEDGEMENTS -->
 ## Acknowledgements
