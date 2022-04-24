@@ -59,8 +59,10 @@
 
 <!-- ABOUT THE PROJECT -->
 ## About The Project
+<p class="aligncenter">
+   <img height="" src="assets/overview.jpg" width="400"/>
+</p>
 
-<img height="" src="assets/overview.jpg" width="300"/>
 
 Here you get a wireless battery powered CO2 monitor device with color display and internet connectivity.
 It is based on the very well known MH-Z19B sensor, and on a ESP32 TTGO Display board, which 
