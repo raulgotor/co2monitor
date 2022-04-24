@@ -26,6 +26,7 @@
 #include "wifi.h"
 
 #include "esp_log.h"
+#include "display.h"
 
 /*
  *******************************************************************************
@@ -147,9 +148,11 @@ bool http_init(void) {
 void http_send_data(uint32_t const data)
 {
 
-        ESP_LOGI(TAG,"SENDING DATA....");
+        ESP_LOGI(TAG,"Sending data to %s", URL);
+        bool linked = false;
         esp_err_t esp_result;
         bool success;
+        int code;
         char post_data[30];
 
         esp_result = esp_http_client_set_url(
@@ -192,12 +195,19 @@ void http_send_data(uint32_t const data)
         }
 
         if (success) {
+                code = esp_http_client_get_status_code(m_client);
                 ESP_LOGI(TAG, "HTTP POST Status = %d, content_length = %i",
-                         esp_http_client_get_status_code(m_client),
+                         code,
                          esp_http_client_get_content_length(m_client));
+
+                if (200 == code) {
+                        linked = true;
+                }
         } else {
                 ESP_LOGE(TAG, "HTTP POST request failed: %s", esp_err_to_name(esp_result));
         }
+
+        display_set_link_status(linked);
 }
 
 /*
