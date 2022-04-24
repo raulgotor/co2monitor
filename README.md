@@ -14,12 +14,6 @@
 [![MIT License][license-shield]][license-url]
 
 <!-- PROJECT LOGO -->
-<br />
-<p align="center">
-  <a href="https://github.com/raulgotor/co2monitor">
-    <!img src="images/logo.png" alt="Logo" width="80" height="80">
-  </a>
-
 <h3 align="center">TTGO ESP32 CO2 Monitor</h3>
 
   <p align="center">
@@ -27,6 +21,9 @@
     <br />
     <a href="https://github.com/raulgotor/co2monitor"><strong>Explore the docs »</strong></a>
     <br />
+    <br />
+
+   <img class="marginauto" src="assets/overview.jpg" width="400" alt="centered image"/>
     <br />
     <a href="https://github.com/raulgotor/co2monitor">View Demo</a>
     ·
@@ -59,10 +56,6 @@
 
 <!-- ABOUT THE PROJECT -->
 ## About The Project
-<p class="aligncenter">
-   <img height="" src="assets/overview.jpg" width="400"/>
-</p>
-
 
 Here you get a wireless battery powered CO2 monitor device with color display and internet connectivity.
 It is based on the very well known MH-Z19B sensor, and on a ESP32 TTGO Display board, which 
