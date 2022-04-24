@@ -219,6 +219,12 @@ bool display_set_battery_level(uint32_t const battery_level)
                                     (void *)(battery_level));
 }
 
+bool display_set_link_status(bool const linked)
+{
+        return display_send_message(DISPLAY_MSG_LINK_STATUS,
+                                    (void *)(linked));
+}
+
 bool display_is_active(void)
 {
         return (portMAX_DELAY != m_display_task_refresh_rate);
@@ -258,7 +264,9 @@ static bool display_send_message(display_msg_type_t const type, void * value)
                 case DISPLAY_MSG_BATTERY_LEVEL:
                         p_message->numeric_value = (uint32_t)value;
                         break;
-
+                case DISPLAY_MSG_LINK_STATUS:
+                        p_message->flag = (bool)value;
+                        break;
                 case DISPLAY_MSG_WIFI_STATUS:
                         p_message->wifi_status = *((display_wifi_status_t *)value);
                         break;
@@ -365,7 +373,7 @@ static void draw_network_symbol(lv_obj_t * canvas, int8_t strength)
         }
 }
 
-static void draw_battery_symbol(lv_obj_t * canvas, int8_t level)
+static void draw_battery_symbol(lv_obj_t * canvas, int level)
 {
         int8_t const min_level = 1;
         int8_t const med_level = 2;
@@ -455,6 +463,44 @@ static void draw_battery_symbol(lv_obj_t * canvas, int8_t level)
                             &draw_dsc);
 }
 
+static void draw_backend_link_symbol(lv_obj_t * canvas, bool linked)
+{
+
+        lv_draw_rect_dsc_t draw_dsc;
+        lv_color_t border_color;
+
+        uint16_t const backend_link_sign_width = 10;
+        uint16_t const backend_link_sign_height = 10;
+
+
+        lv_canvas_set_buffer(canvas,
+                             battery_sign_buffer,
+                             (lv_coord_t)backend_link_sign_width,
+                             (lv_coord_t)backend_link_sign_height,
+                             LV_IMG_CF_TRUE_COLOR);
+
+        lv_canvas_fill_bg(canvas, LV_COLOR_BLACK, LV_OPA_COVER);
+        lv_draw_rect_dsc_init(&draw_dsc);
+
+
+        if (linked) {
+                border_color = LV_COLOR_GREEN;
+        } else {
+                border_color = LV_COLOR_RED;
+        }
+
+        draw_dsc.bg_color = border_color;
+        draw_dsc.border_color = border_color;
+        draw_dsc.radius = backend_link_sign_width / 2;
+
+        lv_canvas_draw_rect(canvas,
+                            0,
+                            0,
+                            backend_link_sign_width,
+                            backend_link_sign_height,
+                            &draw_dsc);
+}
+
 /*
  *******************************************************************************
  * Interrupt Service Routines / Tasks / Thread Main Functions                  *
@@ -476,11 +522,13 @@ _Noreturn static void display_task(void * pvParameters)
         lv_obj_t * const battery_label = lv_label_create(scr, NULL);
         lv_obj_t * const wifi_sign_canvas = lv_canvas_create(scr, NULL);
         lv_obj_t * const battery_sign_canvas = lv_canvas_create(scr, NULL);
+        lv_obj_t * const link_sign_canvas = lv_canvas_create(scr, NULL);
 
         display_msg_t * p_message = NULL;
 
         int8_t rssi;
         uint32_t ip_addr;
+        bool linked;
         uint32_t battery_level;
         uint8_t octets[4];
         uint32_t co2_ppm;
@@ -520,6 +568,7 @@ _Noreturn static void display_task(void * pvParameters)
         lv_label_set_align(ip_label, LV_LABEL_ALIGN_RIGHT);
 
         lv_obj_align(battery_sign_canvas, NULL, LV_ALIGN_IN_BOTTOM_LEFT, 0, -20);
+        lv_obj_align(link_sign_canvas, wifi_sign_canvas, LV_ALIGN_OUT_RIGHT_MID, 0, 0);
 
         lv_obj_add_style(battery_label, LV_LABEL_PART_MAIN, &m_units_style);
         lv_label_set_text(battery_label, battery_label_default_text);
@@ -630,16 +679,26 @@ _Noreturn static void display_task(void * pvParameters)
 
                                 sprintf(text, "%.2f V", ((float)battery_level) / 1000);
 
+                                draw_battery_symbol(battery_sign_canvas, 5);
                                 lv_label_set_text(battery_label, text);
                                 lv_label_set_long_mode(battery_label, LV_LABEL_LONG_EXPAND);
-                                lv_obj_align(battery_label, battery_sign_canvas, LV_ALIGN_OUT_RIGHT_MID, 0, 0);
+                                lv_obj_align(battery_label, battery_sign_canvas, LV_ALIGN_OUT_RIGHT_MID, 5, 0);
 
-                                draw_battery_symbol(battery_sign_canvas, 5);
                                 break;
 
-                                default:
+                        case DISPLAY_MSG_LINK_STATUS:
+                                linked = p_message->flag;
+
+                                draw_backend_link_symbol(link_sign_canvas, linked);
+                                lv_obj_align(link_sign_canvas, wifi_sign_canvas, LV_ALIGN_OUT_RIGHT_MID, 0, 0);
+
+                                break;
+
+                        default:
                                 break;
                         }
+
+
 
                         vPortFree(p_message);
                         p_message = NULL;

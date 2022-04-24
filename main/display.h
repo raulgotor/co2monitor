@@ -35,6 +35,7 @@ typedef enum {
         DISPLAY_MSG_CO2_PPM = 0,
         DISPLAY_MSG_BATTERY_LEVEL,
         DISPLAY_MSG_WIFI_STATUS,
+        DISPLAY_MSG_LINK_STATUS,
         DISPLAY_MSG_COUNT
 } display_msg_type_t;
 
@@ -47,6 +48,7 @@ typedef struct {
         display_msg_type_t type;
         union {
                 uint32_t numeric_value;
+                bool flag;
                 display_wifi_status_t wifi_status;
         };
 } display_msg_t;
@@ -72,6 +74,8 @@ bool display_set_wifi_status(display_wifi_status_t const display_wifi_status);
 bool display_set_concentration(uint32_t const concentration);
 
 bool display_set_battery_level(uint32_t const battery_level);
+
+bool display_set_link_status(bool const linked);
 
 bool display_is_active(void);
 
