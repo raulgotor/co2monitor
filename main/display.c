@@ -692,9 +692,10 @@ _Noreturn static void display_task(void * pvParameters)
                                 draw_backend_link_symbol(link_sign_canvas, linked);
                                 lv_obj_align(link_sign_canvas, wifi_sign_canvas, LV_ALIGN_OUT_RIGHT_MID, 0, 0);
 
+                                draw_battery_symbol(battery_sign_canvas, 5);
                                 break;
 
-                        default:
+                                default:
                                 break;
                         }
 
