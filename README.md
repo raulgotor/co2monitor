@@ -60,7 +60,7 @@
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
-[![Product Name Screen Shot][product-screenshot]](https://example.com)
+<img height="" src="assets/overview.jpg" width="300"/>
 
 Here you get a wireless battery powered CO2 monitor device with color display and internet connectivity.
 It is based on the very well known MH-Z19B sensor, and on a ESP32 TTGO Display board, which 
@@ -99,7 +99,7 @@ with the TTGO board is as follows:
 |     Rx |        25 |
 |     Tx |        33 |
 
-<img height="" src="assets/connections.jpg" width="400"/>
+<img height="" src="assets/connections.jpg" width="300"/>
 
 ### Installation
 
