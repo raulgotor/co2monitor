@@ -28,6 +28,7 @@
 #include "driver/uart.h"
 #include "winsen_mh_z19.h"
 #include "freertos/semphr.h"
+#include "tasks_config.h"
 
 #include "http.h"
 #include "display.h"
@@ -42,10 +43,12 @@
  *******************************************************************************
  */
 
-#define TAG                                 "Sensor"
+#define TAG                                 "sensor"
 
-#define SENSOR_TASK_REFRESH_RATE_MS         (10000)
-#define SENSOR_TASK_REFRESH_RATE_TICKS      (pdMS_TO_TICKS(SENSOR_TASK_REFRESH_RATE_MS))
+#define TASK_REFRESH_RATE_TICKS             (pdMS_TO_TICKS(TASKS_CONFIG_SENSOR_REFRESH_RATE_MS))
+#define TASK_STACK_DEPTH                    TASKS_CONFIG_SENSOR_STACK_DEPTH
+#define TASK_PRIORITY                       TASKS_CONFIG_SENSOR_PRIORITY
+
 /*
  *******************************************************************************
  * Data types                                                                  *
@@ -176,9 +179,9 @@ bool sensor_init(void) {
         if (success) {
                 task_result = xTaskCreate((TaskFunction_t)sensor_task,
                                           "sensor_task",
-                                          8000,
+                                          TASK_STACK_DEPTH,
                                           NULL,
-                                          2,
+                                          TASK_PRIORITY,
                                           &sensor_task_h);
 
                 success = (pdPASS == task_result);
@@ -274,7 +277,7 @@ _Noreturn static void sensor_task(void * pvParameter) {
 
                 task_notify_result = xTaskNotifyWait(0, 0,
                                                      &io_pressed,
-                                                     SENSOR_TASK_REFRESH_RATE_TICKS);
+                                                     TASK_REFRESH_RATE_TICKS);
 
                 /*
                  * Don't even read the sensor if there is no one interested in
@@ -316,9 +319,10 @@ _Noreturn static void sensor_task(void * pvParameter) {
                                 (void)sensor_lock(true);
                                 (void)mh_z19_calibrate_zero_point();
                                 (void)sensor_lock(false);
-
                         }
                 }
+
+                ESP_LOGI(TAG,"Max stack usage: %d of %d bytes", uxTaskGetStackHighWaterMark(NULL), TASK_STACK_DEPTH);
         }
 }
 

@@ -22,6 +22,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/queue.h"
+#include "tasks_config.h"
+
 #include "esp_http_client.h"
 #include "wifi.h"
 
@@ -35,6 +40,11 @@
  */
 
 #define TAG                                 "http"
+
+#define TASK_REFRESH_RATE_TICKS             (pdMS_TO_TICKS(TASKS_CONFIG_HTTP_REFRESH_RATE_MS))
+#define TASK_STACK_DEPTH                    TASKS_CONFIG_HTTP_STACK_DEPTH
+#define TASK_PRIORITY                       TASKS_CONFIG_HTTP_PRIORITY
+
 
 #define MAX_HTTP_OUTPUT_BUFFER              (100)
 
@@ -122,9 +132,9 @@ bool http_init(void) {
 
                 task_result = xTaskCreate((TaskFunction_t)http_task,
                                           "http_task",
-                                          8000,
+                                          TASKS_CONFIG_HTTP_STACK_DEPTH,
                                           NULL,
-                                          2,
+                                          TASKS_CONFIG_HTTP_PRIORITY,
                                           &http_task_h);
 
                 success = (pdPASS == task_result);
@@ -224,13 +234,15 @@ _Noreturn static void http_task(void *pvParameter)
         wifi_status_t wifi_status;
 
         for (;;) {
-                queue_result = xQueueReceive(http_q, &co2_ppm, 500);
+                queue_result = xQueueReceive(http_q, &co2_ppm, TASK_REFRESH_RATE_TICKS);
 
                 wifi_status = wifi_get_status();
 
                 if (pdTRUE == queue_result && (WIFI_STATUS_CONNECTED == wifi_status)) {
                         (void)http_send_data(co2_ppm);
                 }
+
+                ESP_LOGI(TAG,"Max stack usage: %d of %d bytes", uxTaskGetStackHighWaterMark(NULL), TASK_STACK_DEPTH);
         }
 }
 
@@ -304,5 +316,6 @@ static esp_err_t http_event_handler(esp_http_client_event_t *evt)
 
                 break;
         }
+
         return ESP_OK;
 }
