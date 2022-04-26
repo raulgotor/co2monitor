@@ -112,13 +112,15 @@ static int16_t  const m_wifi_sign_width = 30;
 
 static int16_t  const m_wifi_sign_height = (m_wifi_sign_width / 2);
 
-static lv_color_t buffer[LV_CANVAS_BUF_SIZE_TRUE_COLOR(30, 15)];
+static lv_color_t m_wifi_sign_buffer[LV_CANVAS_BUF_SIZE_TRUE_COLOR(30, 15)];
 
 static int16_t  const m_battery_sign_width = 30;
 
 static int16_t  const m_battery_sign_height = (m_battery_sign_width / 2);
 
-static lv_color_t battery_sign_buffer[LV_CANVAS_BUF_SIZE_TRUE_COLOR(30, 15)];
+static lv_color_t m_battery_sign_buffer[LV_CANVAS_BUF_SIZE_TRUE_COLOR(30, 15)];
+
+static lv_color_t m_link_sign_buffer[LV_CANVAS_BUF_SIZE_TRUE_COLOR(30, 30)];
 
 static TimerHandle_t m_backlight_timer_h = NULL;
 
@@ -334,7 +336,7 @@ static void draw_network_symbol(lv_obj_t * canvas, int8_t strength)
         lv_draw_line_dsc_t draw_dsc;
 
         lv_canvas_set_buffer(canvas,
-                             buffer,
+                             m_wifi_sign_buffer,
                              (lv_coord_t)m_wifi_sign_width,
                              (lv_coord_t)m_wifi_sign_height,
                              LV_IMG_CF_TRUE_COLOR);
@@ -411,7 +413,7 @@ static void draw_battery_symbol(lv_obj_t * canvas, int level)
 
 
         lv_canvas_set_buffer(canvas,
-                             battery_sign_buffer,
+                             m_battery_sign_buffer,
                              (lv_coord_t)m_battery_sign_width,
                              (lv_coord_t)m_battery_sign_height,
                              LV_IMG_CF_TRUE_COLOR);
@@ -481,7 +483,7 @@ static void draw_backend_link_symbol(lv_obj_t * canvas, bool linked)
 
 
         lv_canvas_set_buffer(canvas,
-                             battery_sign_buffer,
+                             m_link_sign_buffer,
                              (lv_coord_t)backend_link_sign_width,
                              (lv_coord_t)backend_link_sign_height,
                              LV_IMG_CF_TRUE_COLOR);
@@ -658,6 +660,7 @@ _Noreturn static void display_task(void * pvParameters)
                                 lv_obj_align(co2_value, NULL, LV_ALIGN_CENTER, 0, 0);
 
                                 break;
+
                         case DISPLAY_MSG_WIFI_STATUS:
                                 ip_addr = p_message->wifi_status.ip;
                                 rssi = p_message->wifi_status.rssi;
@@ -720,14 +723,15 @@ _Noreturn static void display_task(void * pvParameters)
                                 draw_battery_symbol(battery_sign_canvas, 5);
                                 break;
 
-                                default:
+                        default:
                                 break;
+
                         }
 
                         vPortFree(p_message);
                         p_message = NULL;
 
-                        ESP_LOGI(TAG,"Max stack usage: %d of %d bytes", uxTaskGetStackHighWaterMark(NULL), TASK_STACK_DEPTH);
+                        ESP_LOGI(TAG,"Max stack usage: %d of %d bytes", TASK_STACK_DEPTH - uxTaskGetStackHighWaterMark(NULL), TASK_STACK_DEPTH);
                 }
 
                 lv_task_handler();

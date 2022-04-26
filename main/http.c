@@ -132,9 +132,9 @@ bool http_init(void) {
 
                 task_result = xTaskCreate((TaskFunction_t)http_task,
                                           "http_task",
-                                          TASKS_CONFIG_HTTP_STACK_DEPTH,
+                                          TASK_STACK_DEPTH,
                                           NULL,
-                                          TASKS_CONFIG_HTTP_PRIORITY,
+                                          TASK_PRIORITY,
                                           &http_task_h);
 
                 success = (pdPASS == task_result);
@@ -242,7 +242,7 @@ _Noreturn static void http_task(void *pvParameter)
                         (void)http_send_data(co2_ppm);
                 }
 
-                ESP_LOGI(TAG,"Max stack usage: %d of %d bytes", uxTaskGetStackHighWaterMark(NULL), TASK_STACK_DEPTH);
+                ESP_LOGI(TAG,"Max stack usage: %d of %d bytes", TASK_STACK_DEPTH - uxTaskGetStackHighWaterMark(NULL), TASK_STACK_DEPTH);
         }
 }
 

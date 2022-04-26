@@ -22,17 +22,20 @@
  *******************************************************************************
  */
 
-#define TASKS_CONFIG_DISPLAY_STACK_DEPTH        (1024 * 16)
-#define TASKS_CONFIG_SENSOR_STACK_DEPTH         (1024 * 8)
-#define TASKS_CONFIG_HTTP_STACK_DEPTH           (1024 * 8)
+#define TASKS_CONFIG_DISPLAY_STACK_DEPTH        (1024 * 4)
+#define TASKS_CONFIG_SENSOR_STACK_DEPTH         (1024 * 2)
+#define TASKS_CONFIG_HTTP_STACK_DEPTH           (1024 * 4)
+#define TASKS_CONFIG_BATTERY_STACK_DEPTH        (1024 * 2)
 
 #define TASKS_CONFIG_DISPLAY_PRIORITY           (1)
 #define TASKS_CONFIG_SENSOR_PRIORITY            (2)
 #define TASKS_CONFIG_HTTP_PRIORITY              (2)
+#define TASKS_CONFIG_BATTERY_PRIORITY           (1)
 
 #define TASKS_CONFIG_DISPLAY_REFRESH_RATE_MS    (10)
 #define TASKS_CONFIG_SENSOR_REFRESH_RATE_MS     (10000)
 #define TASKS_CONFIG_HTTP_REFRESH_RATE_MS       (5000)
+#define TASKS_CONFIG_BATTERY_REFRESH_RATE_MS    (3000)
 
 /*
  *******************************************************************************

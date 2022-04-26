@@ -322,7 +322,7 @@ _Noreturn static void sensor_task(void * pvParameter) {
                         }
                 }
 
-                ESP_LOGI(TAG,"Max stack usage: %d of %d bytes", uxTaskGetStackHighWaterMark(NULL), TASK_STACK_DEPTH);
+                ESP_LOGI(TAG,"Max stack usage: %d of %d bytes", TASK_STACK_DEPTH - uxTaskGetStackHighWaterMark(NULL), TASK_STACK_DEPTH);
         }
 }
 

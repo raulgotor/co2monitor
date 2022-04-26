@@ -21,7 +21,6 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-//#include <freertos/event_groups.h>
 #include <esp_log.h>
 #include "esp_system.h"
 #include "esp_freertos_hooks.h"
@@ -44,11 +43,6 @@
  */
 
 #define TAG "WiFi"
-
-#if EVENT_BITS
-/* FreeRTOS event group to signal when we are connected*/
-//static EventGroupHandle_t s_wifi_event_group;
-#endif // EVENT_BITS
 
 /*
  *******************************************************************************
@@ -73,8 +67,6 @@ static void event_handler(void* arg, esp_event_base_t event_base,
 
 static void wifi_report_status(void);
 
-static void wifi_ap_reconnection(void);
-
 static void wifi_set_connection_status_active(void * p_param);
 
 static void wifi_set_connection_status_inactive(void * p_param);
@@ -92,13 +84,9 @@ extern xQueueHandle display_q;
  *******************************************************************************
  */
 
-static uint32_t m_connect_retries = 0;
-
 static wifi_status_t m_wifi_status = WIFI_STATUS_DISCONNECTED;
 
 static TimerHandle_t m_wifi_status_timer = NULL;
-
-static TimerHandle_t m_wifi_reconnect_timer = NULL;
 
 /*
  *******************************************************************************
@@ -190,7 +178,6 @@ static void wifi_report_status(void)
                 disp_wifi_status.rssi = ap.rssi;
                 memcpy(disp_wifi_status.ap_ssid, ap.ssid, strlen((char *)ap.ssid));
         }
-
 
         display_set_wifi_status(disp_wifi_status);
 
