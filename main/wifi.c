@@ -167,9 +167,7 @@ static void wifi_report_status(void)
         if (ESP_OK != wifi_result) {
                 disp_wifi_status.ip = 0;
                 disp_wifi_status.rssi = DISPLAY_RSSI_NO_IP_VALUE;
-                disp_wifi_status.ap_ssid[0]='|';
-
-
+                disp_wifi_status.ap_ssid[0]='\0';
 
         } else {
                 tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info);

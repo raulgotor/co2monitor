@@ -283,7 +283,7 @@ _Noreturn static void sensor_task(void * pvParameter) {
                  * Don't even read the sensor if there is no one interested in
                  * the output
                  */
-                if ((!display_is_active()) &&
+                if ((!display_is_enabled()) &&
                     (WIFI_STATUS_CONNECTED != wifi_get_status())) {
 
                         // Code style exception for the shake of readability
@@ -297,7 +297,7 @@ _Noreturn static void sensor_task(void * pvParameter) {
                 if (MH_Z19_ERROR_SUCCESS == mh_z19_result) {
 
                         // Don't sent info to display if it isn't active
-                        if ((NULL != display_q) && (display_is_active())) {
+                        if ((NULL != display_q) && (display_is_enabled())) {
                                 (void)display_set_concentration(co2_ppm);
                         }
 
@@ -313,7 +313,7 @@ _Noreturn static void sensor_task(void * pvParameter) {
 
                 if ((MH_Z19_ERROR_SUCCESS == mh_z19_result) &&
                     (pdPASS == task_notify_result) &&
-                    (display_is_active())) {
+                    (display_is_enabled())) {
 
                         if (CALIBRATION_BUTTON == io_pressed) {
                                 (void)sensor_lock(true);

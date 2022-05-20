@@ -82,7 +82,7 @@ static bool display_send_message(display_msg_type_t const type, void * value);
 
 static void backlight_timer_cb(TimerHandle_t const timer_handle);
 
-static void display_enable_backlight(bool const enable);
+static void display_enable_backlight(bool const is_enabled);
 
 /*
  *******************************************************************************
@@ -126,6 +126,8 @@ static TimerHandle_t m_backlight_timer_h = NULL;
 
 static uint32_t m_display_task_refresh_rate = TASK_REFRESH_RATE_TICKS;
 
+static bool m_display_bckl_is_enabled = true;
+
 static lv_color_t m_buffer_1[DISP_BUF_SIZE];
 
 static lv_color_t m_buffer_2[DISP_BUF_SIZE];
@@ -148,6 +150,7 @@ bool display_init(void)
         BaseType_t timer_result;
 
         lv_init();
+
         lvgl_driver_init();
 
         lv_disp_buf_init(&m_display_buffer, m_buffer_1, m_buffer_2, DISP_BUF_SIZE);
@@ -234,9 +237,9 @@ bool display_set_link_status(bool const linked)
                                     (void *)(linked));
 }
 
-bool display_is_active(void)
+bool display_is_enabled(void)
 {
-        return (portMAX_DELAY != m_display_task_refresh_rate);
+        return m_display_bckl_is_enabled;
 }
 
 /*
@@ -305,10 +308,10 @@ static void backlight_timer_cb(TimerHandle_t const timer_handle)
         display_enable_backlight(false);
 }
 
-static void display_enable_backlight(bool const enable)
+static void display_enable_backlight(bool const is_enabled)
 {
 
-        if (enable) {
+        if (is_enabled) {
                 (void)xTimerReset(m_backlight_timer_h, 0);
                 m_display_task_refresh_rate = TASK_REFRESH_RATE_TICKS;
         } else {
@@ -316,7 +319,8 @@ static void display_enable_backlight(bool const enable)
                 m_display_task_refresh_rate = portMAX_DELAY;
         }
 
-        st7789_enable_backlight(enable);
+        m_display_bckl_is_enabled = is_enabled;
+        st7789_enable_backlight(is_enabled);
 }
 
 static void draw_network_symbol(lv_obj_t * canvas, int8_t strength)
@@ -550,7 +554,7 @@ _Noreturn static void display_task(void * pvParameters)
         BaseType_t queue_result;
         BaseType_t notification_result;
         lv_color_t co2_value_color;
-        bool display_active;
+        bool is_enabled;
 
         /* configure CO2 concentration value style */
         lv_style_set_text_font(&m_concentration_style, LV_STATE_DEFAULT, &lv_font_montserrat_48);
@@ -597,17 +601,12 @@ _Noreturn static void display_task(void * pvParameters)
                                                       NULL,
                                                       m_display_task_refresh_rate);
 
-                // Handle backlight state only if automatic mode is configured configured
+                // Handle backlight state only if automatic mode is configured
                 if ((pdPASS == notification_result) && (backlight_automatic)) {
 
-                        display_active = display_is_active();
+                        is_enabled = display_is_enabled();
 
-                        if (!display_is_active()) {
-                                // We're not interested in out-dated messages
-                                xQueueReset(display_q);
-                        }
-
-                        display_enable_backlight(!display_active);
+                        display_enable_backlight(!is_enabled);
                 }
 
                 // Don't receive any messages if the display won't show them
