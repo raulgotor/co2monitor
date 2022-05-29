@@ -109,19 +109,25 @@ with the TTGO board is as follows:
    git clone https://github.com/raulgotor/co2monitor.git
    ```
    
-2. cd into the repo folder and build the firmware:
+2. cd into the repo folder and update submodules:
    ```sh
-   cd co2monitor && idf.py build
+   cd co2monitor && git submodule update --init --recursive
+   ```
+
+   __NOTE__: LVGL library and drivers dependencies comes with some issues that cannot be fixed from these repository,
+   therefore are addressed as patches. Please apply the following patches:
+   
+   ```
+   cd components/lvgl
+   git apply ../../patch/lvgl.patch
+   cd ../lvgl_esp32_drivers
+   git apply ../../patch/st7789.patch
    ```
    
 3. Flash the firmware into the hardware:
    ```sh
    idf.py flash
-
    ```
-__Note__: LVGL dependencies comes with some issues that cannot be fixed from these repository,
-therefore are fixed as patches. Please apply the patches at patches folder using
-`git apply PATCH_NAME` at the corresponding directory
 
 <!-- USAGE EXAMPLES -->
 ## Usage
