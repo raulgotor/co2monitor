@@ -117,7 +117,11 @@ with the TTGO board is as follows:
 3. Flash the firmware into the hardware:
    ```sh
    idf.py flash
+
    ```
+__Note__: LVGL dependencies comes with some issues that cannot be fixed from these repository,
+therefore are fixed as patches. Please apply the patches at patches folder using
+`git apply PATCH_NAME` at the corresponding directory
 
 <!-- USAGE EXAMPLES -->
 ## Usage
