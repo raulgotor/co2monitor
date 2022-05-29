@@ -1,0 +1,73 @@
+@startuml
+'https://plantuml.com/use-case-diagram
+
+<style>
+queue {
+  BackGroundColor #11aabb
+  LineThickness 1
+  LineColor black
+}
+</style>
+
+
+component display {
+    queue display_q
+    control display_task
+
+    frame lvgl [
+            LVGL 6
+        ]
+}
+
+cloud Thingsboard
+
+component http {
+    queue http_q
+    control http_task
+}
+
+component wifi
+
+component sensor {
+
+    control sensor_task
+    component f [
+        Driver
+        ==
+        winsen_mh_z19
+    ]
+}
+
+component battery {
+
+    control battery_task
+    component adc [
+        Driver
+        ==
+        esp_adc
+    ]
+}
+
+component wifi {
+
+    control wifi_timer
+        frame esp32_wifi_manager [
+                esp32_wifi_manager
+            ]
+}
+
+display_q --> display_task
+http_q --> http_task
+
+http_task --> display_q:   DISPLAY_MSG_LINK_STATUS
+wifi_timer --> display_q:   DISPLAY_MSG_WIFI_STATUS
+
+http_task --> Thingsboard
+
+sensor_task --> display_q: DISPLAY_MSG_CO2_PPM
+battery_task --> display_q: DISPLAY_MSG_BATTERY_LEVEL
+
+sensor_task -> http_q
+sensor_task <-.-> wifi
+
+@enduml
