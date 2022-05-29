@@ -122,6 +122,7 @@ with the TTGO board is as follows:
    git apply ../../patch/lvgl.patch
    cd ../lvgl_esp32_drivers
    git apply ../../patch/st7789.patch
+   cd ../..
    ```
    
 3. Flash the firmware into the hardware:
