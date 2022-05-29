@@ -1,0 +1,13 @@
+diff --git a/src/lv_hal/lv_hal_tick.c b/src/lv_hal/lv_hal_tick.c
+index 3a1a5128..4e968b90 100644
+--- a/src/lv_hal/lv_hal_tick.c
++++ b/src/lv_hal/lv_hal_tick.c
+@@ -43,7 +43,7 @@ static volatile uint8_t tick_irq_flag;
+  * You have to call this function periodically
+  * @param tick_period the call period of this function in milliseconds
+  */
+-LV_ATTRIBUTE_TICK_INC void lv_tick_inc(uint32_t tick_period)
++LV_ATTRIBUTE_TICK_INC void IRAM_ATTR lv_tick_inc(uint32_t tick_period)
+ {
+     tick_irq_flag = 0;
+     sys_time += tick_period;
