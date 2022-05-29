@@ -26,9 +26,10 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "tasks_config.h"
 
+#include "esp_log.h"
 #include "driver/adc.h"
-
 #include "driver/adc_common.h"
 
 #include "display.h"
@@ -40,6 +41,11 @@
  * Private Macros                                                              *
  *******************************************************************************
  */
+
+#define TAG                                 "battery"
+#define TASK_REFRESH_RATE_TICKS             (pdMS_TO_TICKS(TASKS_CONFIG_BATTERY_REFRESH_RATE_MS))
+#define TASK_STACK_DEPTH                    TASKS_CONFIG_BATTERY_STACK_DEPTH
+#define TASK_PRIORITY                       TASKS_CONFIG_BATTERY_PRIORITY
 
 #define BATTERY_ADC_AVERAGE_SAMPLES         (10)
 #define BATTERY_ADC_CHANNEL                 ADC1_CHANNEL_6
@@ -113,9 +119,9 @@ bool battery_init(void)
 
                 task_result = xTaskCreate((TaskFunction_t)battery_task,
                                           "battery_task",
-                                          8000,
+                                          TASK_STACK_DEPTH,
                                           NULL,
-                                          1,
+                                          TASK_PRIORITY,
                                           &battery_task_h);
 
                 success = (pdPASS == task_result);
@@ -150,7 +156,7 @@ _Noreturn static void battery_task(void * pvParameters)
 
         while(1) {
 
-                vTaskDelay(pdMS_TO_TICKS(3000));
+                vTaskDelay(TASK_REFRESH_RATE_TICKS);
 
                 raw_value = 0;
 
@@ -165,5 +171,7 @@ _Noreturn static void battery_task(void * pvParameters)
                 battery_level *= m_scale_factor;
 
                 (void)display_set_battery_level(battery_level);
+
+                ESP_LOGI(TAG,"Max stack usage: %d of %d bytes", TASK_STACK_DEPTH - uxTaskGetStackHighWaterMark(NULL), TASK_STACK_DEPTH);
         }
 }

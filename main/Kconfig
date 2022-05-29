@@ -2,21 +2,6 @@
 
 menu "Application configuration"
 
-    config CO2_MONITOR_WIFI_SSID
-        string
-        prompt "AP station SSID"
-        default "Default_SSID_name"
-
-    config CO2_MONITOR_WIFI_PASSWORD
-        string
-        prompt "AP station password"
-        default "password"
-
-    config CO2_MONITOR_AUTO_RECONNECT_TIME_S
-            int
-            prompt "Attempt reconnection some time after a failed connection event (in seconds)"
-            default 300
-
     config CO2_MONITOR_DEVICE_URL
         string
         prompt "Thingsboard server's URL"

@@ -42,6 +42,7 @@ typedef enum {
 typedef struct {
         int8_t rssi;
         uint32_t ip;
+        char ap_ssid[33];
 } display_wifi_status_t;
 
 typedef struct {
@@ -77,6 +78,6 @@ bool display_set_battery_level(uint32_t const battery_level);
 
 bool display_set_link_status(bool const linked);
 
-bool display_is_active(void);
+bool display_is_enabled(void);
 
 #endif //MAIN_MAIN_DISPLAY_H_

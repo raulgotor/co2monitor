@@ -1,11 +1,11 @@
 /*!
  *******************************************************************************
- * @file sensor.h
+ * @file tasks_config.h
  *
- * @brief
+ * @brief 
  *
  * @author Raúl Gotor (raulgotor@gmail.com)
- * @date 03.04.22
+ * @date 24.04.22
  *
  * @par
  * COPYRIGHT NOTICE: (c) 2022 Raúl Gotor
@@ -13,8 +13,8 @@
  *******************************************************************************
  */
 
-#ifndef SENSOR_H_
-#define SENSOR_H_
+#ifndef TASKS_CONFIG_H
+#define TASKS_CONFIG_H
 
 /*
  *******************************************************************************
@@ -22,9 +22,20 @@
  *******************************************************************************
  */
 
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
-#include <freertos/queue.h>
+#define TASKS_CONFIG_DISPLAY_STACK_DEPTH        (1024 * 4)
+#define TASKS_CONFIG_SENSOR_STACK_DEPTH         (1024 * 2)
+#define TASKS_CONFIG_HTTP_STACK_DEPTH           (1024 * 4)
+#define TASKS_CONFIG_BATTERY_STACK_DEPTH        (1024 * 2)
+
+#define TASKS_CONFIG_DISPLAY_PRIORITY           (1)
+#define TASKS_CONFIG_SENSOR_PRIORITY            (2)
+#define TASKS_CONFIG_HTTP_PRIORITY              (2)
+#define TASKS_CONFIG_BATTERY_PRIORITY           (1)
+
+#define TASKS_CONFIG_DISPLAY_REFRESH_RATE_MS    (10)
+#define TASKS_CONFIG_SENSOR_REFRESH_RATE_MS     (10000)
+#define TASKS_CONFIG_HTTP_REFRESH_RATE_MS       (5000)
+#define TASKS_CONFIG_BATTERY_REFRESH_RATE_MS    (3000)
 
 /*
  *******************************************************************************
@@ -38,13 +49,11 @@
  *******************************************************************************
  */
 
+
 /*
  *******************************************************************************
  * Public Function Prototypes                                                  *
  *******************************************************************************
  */
 
-//! @brief Initialize the sensor module
-bool sensor_init(void);
-
-#endif //SENSOR_H_
+#endif //TASKS_CONFIG_H

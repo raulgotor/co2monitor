@@ -28,6 +28,7 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "freertos/timers.h"
+#include "tasks_config.h"
 
 #include "driver/adc_common.h"
 #include "esp_freertos_hooks.h"
@@ -45,7 +46,13 @@
  */
 
 #define DISPLAY_NO_IP_TEXT                  "No IP"
-#define TAG                                 "DISPLAY"
+#define DISPLAY_NO_AP_TEXT                  "No AP"
+#define NO_WAIT                             (0)
+
+#define TASK_REFRESH_RATE_TICKS     (pdMS_TO_TICKS(TASKS_CONFIG_DISPLAY_REFRESH_RATE_MS))
+#define TASK_STACK_DEPTH            TASKS_CONFIG_DISPLAY_STACK_DEPTH
+#define TASK_PRIORITY               TASKS_CONFIG_DISPLAY_PRIORITY
+#define TAG                                 "display"
 
 /*
  *******************************************************************************
@@ -75,7 +82,7 @@ static bool display_send_message(display_msg_type_t const type, void * value);
 
 static void backlight_timer_cb(TimerHandle_t const timer_handle);
 
-static void display_enable_backlight(bool const enable);
+static void display_enable_backlight(bool const is_enabled);
 
 /*
  *******************************************************************************
@@ -105,17 +112,21 @@ static int16_t  const m_wifi_sign_width = 30;
 
 static int16_t  const m_wifi_sign_height = (m_wifi_sign_width / 2);
 
-static lv_color_t buffer[LV_CANVAS_BUF_SIZE_TRUE_COLOR(30, 15)];
+static lv_color_t m_wifi_sign_buffer[LV_CANVAS_BUF_SIZE_TRUE_COLOR(30, 15)];
 
 static int16_t  const m_battery_sign_width = 30;
 
 static int16_t  const m_battery_sign_height = (m_battery_sign_width / 2);
 
-static lv_color_t battery_sign_buffer[LV_CANVAS_BUF_SIZE_TRUE_COLOR(30, 15)];
+static lv_color_t m_battery_sign_buffer[LV_CANVAS_BUF_SIZE_TRUE_COLOR(30, 15)];
+
+static lv_color_t m_link_sign_buffer[LV_CANVAS_BUF_SIZE_TRUE_COLOR(30, 30)];
 
 static TimerHandle_t m_backlight_timer_h = NULL;
 
-static uint32_t m_display_task_refresh_rate = pdMS_TO_TICKS(100);
+static uint32_t m_display_task_refresh_rate = TASK_REFRESH_RATE_TICKS;
+
+static bool m_display_bckl_is_enabled = true;
 
 static lv_color_t m_buffer_1[DISP_BUF_SIZE];
 
@@ -139,6 +150,7 @@ bool display_init(void)
         BaseType_t timer_result;
 
         lv_init();
+
         lvgl_driver_init();
 
         lv_disp_buf_init(&m_display_buffer, m_buffer_1, m_buffer_2, DISP_BUF_SIZE);
@@ -190,9 +202,9 @@ bool display_init(void)
 
                 task_result = xTaskCreate((TaskFunction_t)display_task,
                             "display_task",
-                            8000,
+                            TASK_STACK_DEPTH,
                             NULL,
-                            1,
+                            TASK_PRIORITY,
                             &display_task_h);
 
                 success = (pdPASS == task_result);
@@ -225,9 +237,9 @@ bool display_set_link_status(bool const linked)
                                     (void *)(linked));
 }
 
-bool display_is_active(void)
+bool display_is_enabled(void)
 {
-        return (portMAX_DELAY != m_display_task_refresh_rate);
+        return m_display_bckl_is_enabled;
 }
 
 /*
@@ -296,18 +308,19 @@ static void backlight_timer_cb(TimerHandle_t const timer_handle)
         display_enable_backlight(false);
 }
 
-static void display_enable_backlight(bool const enable)
+static void display_enable_backlight(bool const is_enabled)
 {
 
-        if (enable) {
+        if (is_enabled) {
                 (void)xTimerReset(m_backlight_timer_h, 0);
-                m_display_task_refresh_rate = pdMS_TO_TICKS(1000);
+                m_display_task_refresh_rate = TASK_REFRESH_RATE_TICKS;
         } else {
                 (void)xTimerStop(m_backlight_timer_h, 0);
                 m_display_task_refresh_rate = portMAX_DELAY;
         }
 
-        st7789_enable_backlight(enable);
+        m_display_bckl_is_enabled = is_enabled;
+        st7789_enable_backlight(is_enabled);
 }
 
 static void draw_network_symbol(lv_obj_t * canvas, int8_t strength)
@@ -327,7 +340,7 @@ static void draw_network_symbol(lv_obj_t * canvas, int8_t strength)
         lv_draw_line_dsc_t draw_dsc;
 
         lv_canvas_set_buffer(canvas,
-                             buffer,
+                             m_wifi_sign_buffer,
                              (lv_coord_t)m_wifi_sign_width,
                              (lv_coord_t)m_wifi_sign_height,
                              LV_IMG_CF_TRUE_COLOR);
@@ -404,7 +417,7 @@ static void draw_battery_symbol(lv_obj_t * canvas, int level)
 
 
         lv_canvas_set_buffer(canvas,
-                             battery_sign_buffer,
+                             m_battery_sign_buffer,
                              (lv_coord_t)m_battery_sign_width,
                              (lv_coord_t)m_battery_sign_height,
                              LV_IMG_CF_TRUE_COLOR);
@@ -474,7 +487,7 @@ static void draw_backend_link_symbol(lv_obj_t * canvas, bool linked)
 
 
         lv_canvas_set_buffer(canvas,
-                             battery_sign_buffer,
+                             m_link_sign_buffer,
                              (lv_coord_t)backend_link_sign_width,
                              (lv_coord_t)backend_link_sign_height,
                              LV_IMG_CF_TRUE_COLOR);
@@ -513,6 +526,9 @@ _Noreturn static void display_task(void * pvParameters)
         uint32_t const high_concentration_min = 1500;
         char const * ip_label_default_text = "No IP";
         char const * battery_label_default_text = "";
+        size_t const ssid_str_size = 33;
+        size_t const ip_str_size = 16;
+        size_t const separator_size = 3;
         bool const backlight_automatic = (NULL != m_backlight_timer_h);
 
         lv_obj_t * const scr = lv_scr_act();
@@ -532,12 +548,13 @@ _Noreturn static void display_task(void * pvParameters)
         uint32_t battery_level;
         uint8_t octets[4];
         uint32_t co2_ppm;
-        char text[20];
+        char label_buffer[ssid_str_size + separator_size + ip_str_size];
+        char ip_str[ip_str_size];
         bool style_changed;
         BaseType_t queue_result;
         BaseType_t notification_result;
         lv_color_t co2_value_color;
-        bool display_active;
+        bool is_enabled;
 
         /* configure CO2 concentration value style */
         lv_style_set_text_font(&m_concentration_style, LV_STATE_DEFAULT, &lv_font_montserrat_48);
@@ -562,10 +579,11 @@ _Noreturn static void display_task(void * pvParameters)
         lv_label_set_align(co2_value, LV_LABEL_ALIGN_CENTER);
 
         lv_obj_add_style(ip_label, LV_LABEL_PART_MAIN, &m_units_style);
+        lv_label_set_long_mode(ip_label, LV_LABEL_LONG_SROLL_CIRC);
+        lv_obj_set_width(ip_label, 100);
         lv_label_set_text(ip_label, ip_label_default_text);
-        lv_label_set_long_mode(ip_label, LV_LABEL_LONG_EXPAND);
         lv_obj_align(ip_label, NULL, LV_ALIGN_IN_TOP_RIGHT, 0, 0);
-        lv_label_set_align(ip_label, LV_LABEL_ALIGN_RIGHT);
+        lv_label_set_anim_speed(ip_label, 100);
 
         lv_obj_align(battery_sign_canvas, NULL, LV_ALIGN_IN_BOTTOM_LEFT, 0, -20);
         lv_obj_align(link_sign_canvas, wifi_sign_canvas, LV_ALIGN_OUT_RIGHT_MID, 0, 0);
@@ -576,7 +594,6 @@ _Noreturn static void display_task(void * pvParameters)
         lv_obj_align(battery_label, battery_sign_canvas, LV_ALIGN_OUT_RIGHT_MID, 0, 0);
         lv_label_set_align(battery_label, LV_LABEL_ALIGN_LEFT);
 
-
         while (1) {
 
                 notification_result = xTaskNotifyWait(0xFFFFFFFFUL,
@@ -584,17 +601,12 @@ _Noreturn static void display_task(void * pvParameters)
                                                       NULL,
                                                       m_display_task_refresh_rate);
 
-                // Handle backlight state only if automatic mode is configured configured
+                // Handle backlight state only if automatic mode is configured
                 if ((pdPASS == notification_result) && (backlight_automatic)) {
 
-                        display_active = display_is_active();
+                        is_enabled = display_is_enabled();
 
-                        if (!display_is_active()) {
-                                // We're not interested in out-dated messages
-                                xQueueReset(display_q);
-                        }
-
-                        display_enable_backlight(!display_active);
+                        display_enable_backlight(!is_enabled);
                 }
 
                 // Don't receive any messages if the display won't show them
@@ -603,7 +615,7 @@ _Noreturn static void display_task(void * pvParameters)
                         continue;
                 }
 
-                queue_result = xQueueReceive(display_q, &p_message, 0);
+                queue_result = xQueueReceive(display_q, &p_message, NO_WAIT);
 
                 if ((pdTRUE == queue_result) && (NULL != p_message)) {
 
@@ -641,34 +653,49 @@ _Noreturn static void display_task(void * pvParameters)
                                                         &m_concentration_style);
                                 }
 
-                                sprintf(text, "%u", co2_ppm);
-                                lv_label_set_text(co2_value, text);
+                                sprintf(label_buffer, "%u", co2_ppm);
+                                lv_label_set_text(co2_value, label_buffer);
                                 lv_label_set_long_mode(co2_value, LV_LABEL_LONG_EXPAND);
                                 lv_obj_align(co2_value, NULL, LV_ALIGN_CENTER, 0, 0);
 
                                 break;
+
                         case DISPLAY_MSG_WIFI_STATUS:
                                 ip_addr = p_message->wifi_status.ip;
                                 rssi = p_message->wifi_status.rssi;
 
+                                if (0 == strlen(p_message->wifi_status.ap_ssid)) {
+                                        strcpy(label_buffer, DISPLAY_NO_AP_TEXT);
+                                } else {
+                                        strcpy(label_buffer,
+                                                p_message->wifi_status.ap_ssid);
+                                }
+
                                 if (0 == ip_addr) {
-                                        sprintf(text, DISPLAY_NO_IP_TEXT);
+                                        sprintf(ip_str, DISPLAY_NO_IP_TEXT);
                                 } else {
                                         octets[3] = (uint8_t)((ip_addr >> 3) & 0x000000FF);
                                         octets[2] = (uint8_t)((ip_addr >> 2) & 0x000000FF);
                                         octets[1] = (uint8_t)((ip_addr >> 1) & 0x000000FF);
                                         octets[0] = (uint8_t)(ip_addr & 0x000000FF);
 
-                                        sprintf(text, "%u.%u.%u.%u",
+                                        sprintf(ip_str, "%u.%u.%u.%u",
                                                 octets[0],
                                                 octets[1],
                                                 octets[2],
                                                 octets[3]);
                                 }
 
-                                lv_label_set_text(ip_label, text);
-                                lv_label_set_long_mode(ip_label, LV_LABEL_LONG_EXPAND);
-                                lv_obj_align(ip_label, NULL, LV_ALIGN_IN_TOP_RIGHT, 0, 0);
+                                strcat(label_buffer, ", ");
+                                strcat(label_buffer, ip_str);
+
+                                /* Only refresh label if it changed, so scroll
+                                 * animation is not spoiled
+                                 */
+                                if (0 != strcmp(label_buffer,
+                                                lv_label_get_text(ip_label))) {
+                                        lv_label_set_text(ip_label, label_buffer);
+                                }
 
                                 draw_network_symbol(wifi_sign_canvas, rssi);
 
@@ -677,10 +704,10 @@ _Noreturn static void display_task(void * pvParameters)
                         case DISPLAY_MSG_BATTERY_LEVEL:
                                 battery_level = p_message->numeric_value;
 
-                                sprintf(text, "%.2f V", ((float)battery_level) / 1000);
+                                sprintf(label_buffer, "%.2f V", ((float)battery_level) / 1000);
 
                                 draw_battery_symbol(battery_sign_canvas, 5);
-                                lv_label_set_text(battery_label, text);
+                                lv_label_set_text(battery_label, label_buffer);
                                 lv_label_set_long_mode(battery_label, LV_LABEL_LONG_EXPAND);
                                 lv_obj_align(battery_label, battery_sign_canvas, LV_ALIGN_OUT_RIGHT_MID, 5, 0);
 
@@ -695,14 +722,15 @@ _Noreturn static void display_task(void * pvParameters)
                                 draw_battery_symbol(battery_sign_canvas, 5);
                                 break;
 
-                                default:
+                        default:
                                 break;
+
                         }
-
-
 
                         vPortFree(p_message);
                         p_message = NULL;
+
+                        ESP_LOGI(TAG,"Max stack usage: %d of %d bytes", TASK_STACK_DEPTH - uxTaskGetStackHighWaterMark(NULL), TASK_STACK_DEPTH);
                 }
 
                 lv_task_handler();
