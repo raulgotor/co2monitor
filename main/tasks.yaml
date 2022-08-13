@@ -1,0 +1,19 @@
+- task_name: display
+  depth: 1024 * 4
+  priority: 1
+  rate_ms: 10
+
+- task_name: sensor
+  depth: 1024 * 4
+  priority: 2
+  rate_ms: 10000
+
+- task_name: http
+  depth: 1024 * 4
+  priority: 2
+  rate_ms: 5000
+
+- task_name: battery
+  depth: 1024 * 4
+  priority: 1
+  rate_ms: 3000
