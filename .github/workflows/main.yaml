@@ -1,0 +1,33 @@
+name: Build
+
+on: 
+  push:
+    branches:
+      - '**'
+
+jobs:
+  build:
+    name: Build Image
+    runs-on: ubuntu-latest
+    container:
+      image: espressif/idf:v4.4
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v2
+    - name: Build Image
+      run: |
+        . $IDF_PATH/export.sh
+        idf.py build
+        echo $(ls)
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: build_artifacts
+        path: |
+          build/*.bin
+          build/*.elf
+          build/*.map
+          build/bootloader/*.bin
+          build/bootloader/*.elf
+          build/bootloader/*.map
+          build/partition_table/*.bin
